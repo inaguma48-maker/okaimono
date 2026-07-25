@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<!--
+  おかいものメモ（公開版）
+  無料の買い物リスト・予算管理・価格記録アプリ / 単一HTMLファイルで動作
+  License: MIT — 自由に利用・改変・再配布できます
+  すべてのデータは利用者のブラウザ（localStorage）内にのみ保存されます
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>おかいものメモ - 無料の買い物リスト・予算管理アプリ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="おかいもの">
+<meta name="theme-color" content="#FBFAF6">
+<meta name="description" content="無料の買い物リスト・予算管理・価格記録アプリ。データは端末内のみ保存。">
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #26303E; --paper: #FBFAF6; --line: #E4E1D7;
+    --marker: #FFE94D; --red: #D64545; --green: #4C8C4A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Zen Kaku Gothic New', sans-serif;
+    background: repeating-linear-gradient(var(--paper), var(--paper) 31px, var(--line) 31px, var(--line) 32px);
+    color: var(--ink); margin: 0; padding: 20px 16px 60px;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  h1 { font-family: 'Yomogi', cursive; font-size: 30px; margin: 0; letter-spacing: 2px; text-align: center; }
+  .sub { text-align: center; font-size: 13px; color: #6B7280; margin: 4px 0 14px; }
+  button, select, input, textarea { font-family: inherit; }
+  .bigbtn {
+    flex: 1; padding: 14px 8px; font-size: 15px; font-weight: 700; border-radius: 14px;
+    border: 2px solid var(--ink); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); background: #FFF;
+  }
+  .bigbtn.yellow { background: var(--marker); }
+  .bigbtn:disabled { opacity: 0.5; }
+  .actions { display: flex; gap: 10px; margin-bottom: 10px; }
+  .flyerbtn {
+    width: 100%; padding: 11px 8px; font-size: 13px; font-weight: 700; border-radius: 12px;
+    border: 2px solid var(--red); background: #FFF; color: var(--red); cursor: pointer; margin-bottom: 12px;
+  }
+  .smallbtn {
+    font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: #FFF; cursor: pointer; color: var(--ink);
+  }
+  .smallbtn.on { background: var(--red); color: #FFF; border-color: var(--red); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    flex: 1; padding: 9px 0; font-size: 14px; border-radius: 10px; border: 1.5px solid var(--line);
+    background: #FFF; color: #6B7280; cursor: pointer;
+  }
+  .tab.on { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+  .box { background: #FFF; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .boxframe { background: #FFF; border: 2px solid var(--ink); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; box-shadow: 2px 2px 0 var(--ink); }
+  .error { background: #FBEAEA; color: #B03A3A; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 10px; }
+  .notice { background: #FFF; border: 1.5px solid var(--ink); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 10px; white-space: pre-wrap; line-height: 1.7; }
+  .empty { text-align: center; padding: 32px 12px; color: #6B7280; font-size: 14px; background: rgba(255,255,255,0.7); border-radius: 14px; border: 1.5px dashed var(--line); margin-bottom: 12px; }
+  .catlabel { font-size: 13px; font-weight: 700; margin: 0 0 6px 2px; display: flex; gap: 6px; align-items: center; }
+  .catcount { font-size: 11px; font-weight: 400; color: #9CA3AF; }
+  .row { display: flex; align-items: stretch; background: #FFF; border-radius: 12px; border: 1px solid var(--line); margin-bottom: 6px; overflow: hidden; }
+  .rowmain { flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px; background: none; border: none; cursor: pointer; text-align: left; min-width: 0; }
+  .cb { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; background: #FFF; }
+  .cb.on { background: var(--marker); }
+  .iname { font-size: 15px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .iname.done { color: #9CA3AF; text-decoration: line-through; background: linear-gradient(transparent 55%, var(--marker) 55%, var(--marker) 90%, transparent 90%); }
+  .qty { font-size: 12px; color: #6B7280; }
+  .saletag { display: inline-block; font-size: 9px; font-weight: 700; color: #FFF; background: var(--red); border-radius: 4px; padding: 1px 5px; margin-right: 6px; vertical-align: middle; }
+  .rowbtn { align-self: center; border: none; background: none; font-size: 16px; padding: 4px 2px; cursor: pointer; text-decoration: none; }
+  .planbtn { align-self: center; border: 1.5px dashed var(--ink); background: #FFF; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--ink); padding: 4px 7px; margin-right: 2px; cursor: pointer; white-space: nowrap; }
+  .planbtn.sale { border-color: var(--red); color: var(--red); }
+  .delbtn { border: none; background: none; color: #C4C0B4; font-size: 20px; padding: 0 12px; cursor: pointer; }
+  .addbox { display: flex; gap: 6px; margin-top: 14px; }
+  .addbox input[type=text] { flex: 1; padding: 10px 12px; font-size: 14px; border-radius: 10px; border: 1.5px solid var(--line); min-width: 0; }
+  .addbox select { font-size: 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #FFF; max-width: 96px; }
+  .addbtn { padding: 10px 14px; font-size: 14px; font-weight: 700; border-radius: 10px; border: 2px solid var(--ink); background: var(--marker); cursor: pointer; }
+  textarea { width: 100%; padding: 10px 12px; font-size: 13px; border-radius: 10px; border: 1.5px solid var(--line); resize: vertical; }
+  .budget-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 13px; }
+  .budget-row input { width: 76px; padding: 5px 8px; font-size: 14px; font-weight: 700; border-radius: 8px; border: 1.5px solid var(--line); text-align: right; }
+  .btrack { height: 10px; background: #F0EEE6; border-radius: 6px; margin-top: 8px; border: 1px solid var(--line); overflow: hidden; }
+  .bfill { height: 100%; border-radius: 5px; transition: width 0.3s; background: var(--marker); }
+  .bfill.over { background: var(--red); }
+  .bleft { font-size: 12px; font-weight: 700; margin-top: 4px; text-align: right; }
+  .pricetag { margin-left: 8px; font-size: 12px; font-weight: 700; background: var(--marker); border-radius: 6px; padding: 1px 6px; }
+  .missbox { background: #FDF1EE; border: 2px solid var(--red); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .okbox { background: #EDF7ED; border: 2px solid var(--green); border-radius: 14px; padding: 16px; font-weight: 700; color: #2F5E2E; margin-bottom: 14px; font-size: 15px; }
+  .flyerbox { background: #FFF; border: 2px solid var(--red); border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; box-shadow: 2px 2px 0 var(--red); }
+  .chartarea { display: flex; align-items: stretch; gap: 3px; height: 150px; }
+  .chartcol { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .chartval { font-size: 9px; font-weight: 700; height: 14px; line-height: 14px; }
+  .bartrack { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; border-bottom: 2px solid var(--ink); }
+  .bar { width: 70%; background: var(--marker); border: 1.5px solid var(--ink); border-bottom: none; border-radius: 4px 4px 0 0; }
+  .chartlabel { font-size: 9px; color: #6B7280; margin-top: 4px; white-space: nowrap; }
+  footer { text-align: center; font-size: 11px; color: #B4B0A4; margin-top: 30px; }
+  details.setup { background: #FFF; border: 1.5px solid var(--ink); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+  details.setup summary { font-weight: 700; cursor: pointer; }
+  details.setup input, details.setup select { width: 100%; padding: 8px 10px; font-size: 13px; border-radius: 8px; border: 1.5px solid var(--line); margin-top: 6px; }
+  details.setup label { display: block; font-size: 12px; font-weight: 700; margin-top: 10px; }
+  .hint { font-size: 11px; color: #6B7280; line-height: 1.7; margin-top: 8px; }
+  .loading { display: flex; align-items: center; gap: 8px; background: #FFF; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 10px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--marker); border: 2px solid var(--ink); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } .bfill { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>おかいものメモ</h1>
+  <p class="sub">買い物リスト・予算管理・価格記録が全部無料。データは端末内のみ保存</p>
+
+  <details class="setup">
+    <summary>📖 使い方</summary>
+    <div class="hint" style="margin-top:6px;">
+      <b>基本（すべて無料・通信不要）</b><br>
+      ・下の入力欄や「まとめて追加」で品目を登録。カテゴリは自動判定されます<br>
+      ・予算を入力すると、品目ごとの予定価格（¥ボタンで入力）の合計と残額をゲージ表示<br>
+      ・チラシ特売品は🏷でタグ付け。「★キャベツ 98円」のように書けば一括登録もできます<br>
+      ・買った価格を「価格推移」タブで記録すると、品目別の年間グラフが見られます<br>
+      ・データはこの端末のブラウザ内にのみ保存されます。外部に送信されません。「💾 データの保管」から手動バックアップができます
+    </div>
+  </details>
+
+  <details class="setup" id="setup">
+    <summary>🤖 AI読み取り設定（任意・自分のAPIキーをお持ちの方向け）</summary>
+    <div class="hint" style="margin-top:6px;">
+      写真からの自動読み取り（メモ・レシート・チラシ）を使いたい場合のみ設定してください。<b>設定しなくても、それ以外の全機能は無料で使えます。</b><br>
+      利用にはAnthropicのAPIキー（従量課金・読み取り1回1円未満目安）が必要です。キーはこのブラウザ内にのみ保存され、Anthropic以外に送信されることはありません。
+    </div>
+    <label>Anthropic APIキー</label>
+    <input type="password" id="apikey" placeholder="sk-ant-...（未設定でもアプリは使えます）" autocomplete="off">
+    <label>読み取りに使うモデル</label>
+    <select id="model">
+      <option value="claude-haiku-4-5-20251001">Haiku（速い・安い / おすすめ）</option>
+      <option value="claude-sonnet-4-6">Sonnet（高精度・細かいチラシ向け）</option>
+    </select>
+    <div style="display:flex; gap:6px; margin-top:10px;">
+      <button class="smallbtn" onclick="saveSettings()">保存</button>
+      <button class="smallbtn" onclick="runDiag()">⚙️ 接続テスト</button>
+    </div>
+  </details>
+
+  <div class="actions">
+    <button class="bigbtn yellow" id="memoBtn" onclick="pick('memo')">📝 メモを読み取る</button>
+    <button class="bigbtn" id="receiptBtn" onclick="pick('receipt')">🧾 レシートで確認</button>
+  </div>
+  <button class="flyerbtn" id="flyerBtn" onclick="pick('flyer')">🔴 チラシの赤丸商品とリストを照合（書き忘れチェック）</button>
+  <input type="file" accept="image/*" id="fileInput" hidden>
+
+  <div id="loading"></div>
+  <div id="error"></div>
+  <div id="notice"></div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="list" onclick="setTab('list')">リスト</button>
+    <button class="tab" data-tab="check" onclick="setTab('check')">買い忘れ確認</button>
+    <button class="tab" data-tab="price" onclick="setTab('price')">価格推移</button>
+  </div>
+
+  <div id="content"></div>
+
+  <div style="margin-top:24px;">
+    <button class="smallbtn" onclick="toggleData()">💾 データの保管（バックアップ・復元）</button>
+    <div id="dataPanel" style="display:none;" class="box">
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="smallbtn" onclick="doExport()">全データを書き出す</button>
+        <button class="smallbtn" onclick="doExportCsv()">価格履歴をCSVで書き出す</button>
+        <button class="smallbtn" onclick="downloadBackup()">ファイルとして保存</button>
+      </div>
+      <div id="dataMsg" style="font-size:12px; color:var(--green); font-weight:700; margin-top:8px;"></div>
+      <textarea id="exportArea" rows="5" readonly style="display:none; margin-top:8px; font-size:11px;" onfocus="this.select()"></textarea>
+      <div style="margin-top:12px; font-size:12px; font-weight:700;">復元（インポート）</div>
+      <textarea id="importArea" rows="3" style="margin-top:6px; font-size:11px;" placeholder="以前書き出したテキスト（Claude内アプリの書き出しもそのまま使えます）"></textarea>
+      <button class="smallbtn" style="margin-top:6px;" onclick="doImport()">このデータで復元する</button>
+    </div>
+  </div>
+
+  <footer>
+    データはお使いの端末内にのみ保存されます（外部送信なし）。<br>
+    AI読み取り利用時の結果は必ずご自身でもご確認ください。<br>
+    このアプリは無料で自由に利用・共有できます（MIT License）。
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ===== 状態 =====
+const CATEGORIES = [
+  { id: "野菜・果物", color: "#4C8C4A" }, { id: "肉・魚", color: "#B0563B" },
+  { id: "乳製品・卵", color: "#B89230" }, { id: "パン・穀類", color: "#8A6D3B" },
+  { id: "調味料", color: "#7A5EA6" }, { id: "飲料", color: "#3B7EA6" },
+  { id: "日用品", color: "#5B6B7A" }, { id: "その他", color: "#6B6B6B" },
+];
+const CAT_KEYWORDS = {
+  "野菜・果物": ["ピーマン","パプリカ","小松菜","ナス","なす","キャベツ","キウイ","ミカン","みかん","トマト","きゅうり","レタス","にんじん","人参","玉ねぎ","たまねぎ","じゃがいも","バナナ","りんご","白菜","ねぎ","ほうれん草","もやし","大根","ブロッコリー","いちご","ぶどう"],
+  "肉・魚": ["肉","豚","牛","鶏","ささみ","ベーコン","ハム","ソーセージ","ウインナー","魚","鮭","さけ","さば","サバ","うなぎ","えび","イカ","しらす","ツナ","焼売","シュウマイ","餃子"],
+  "乳製品・卵": ["牛乳","ミルク","卵","たまご","玉子","チーズ","ヨーグルト","バター","生クリーム"],
+  "パン・穀類": ["パン","食パン","ロール","米","ごはん","麺","焼そば","焼きそば","そば","うどん","パスタ","ラーメン","冷し中華","冷やし中華","シリアル","もち","餅"],
+  "調味料": ["醤油","しょうゆ","味噌","みそ","たれ","タレ","ソース","塩","砂糖","油","みりん","酢","ドレッシング","ケチャップ","マヨネーズ","だし","コンソメ","カレールー","ジャム"],
+  "飲料": ["茶","コーヒー","ジュース","水","ビール","酒","ワイン","炭酸","コーラ","ミネラルウォーター"],
+  "日用品": ["洗剤","ティッシュ","トイレ","シャンプー","リンス","石けん","石鹸","歯磨き","電池","ラップ","ホイル","ゴミ袋","スポンジ","マスク"],
+};
+let state = { items: [], priceHistory: [], budget: "", receiptResult: null };
+let ui = { tab: "list", grouped: true, onlySale: false, bulkOpen: false, bulkText: "", flyerResult: null, priceItem: "" };
+let pickMode = null;
+
+// ===== 保存・読み込み =====
+function save() { localStorage.setItem("okaimono.data", JSON.stringify(state)); }
+function load() {
+  try { const d = JSON.parse(localStorage.getItem("okaimono.data")); if (d) state = Object.assign(state, d); } catch (e) {}
+  document.getElementById("apikey").value = localStorage.getItem("okaimono.apikey") || "";
+  document.getElementById("model").value = localStorage.getItem("okaimono.model") || "claude-haiku-4-5-20251001";
+
+}
+function saveSettings() {
+  localStorage.setItem("okaimono.apikey", document.getElementById("apikey").value.trim());
+  localStorage.setItem("okaimono.model", document.getElementById("model").value);
+  notice("設定を保存しました。「接続テスト」で確認できます。");
+}
+
+// ===== ユーティリティ =====
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function guessCategory(name) {
+  for (const [cat, words] of Object.entries(CAT_KEYWORDS)) if (words.some(w => name.includes(w))) return cat;
+  return "その他";
+}
+function catColor(id) { const c = CATEGORIES.find(c => c.id === id); return c ? c.color : "#6B6B6B"; }
+function lastPrice(name) {
+  const hits = state.priceHistory.filter(e => e.name === name).sort((a,b) => a.date < b.date ? 1 : -1);
+  return hits.length ? hits[0].price : null;
+}
+function nameMatch(a, b) {
+  const n = x => x.replace(/[\s　]/g, "").toLowerCase();
+  const na = n(a), nb = n(b);
+  return !!na && !!nb && (na.includes(nb) || nb.includes(na));
+}
+function notice(msg) { document.getElementById("notice").innerHTML = msg ? '<div class="notice">' + esc(msg) + "</div>" : ""; }
+function showError(msg) { document.getElementById("error").innerHTML = msg ? '<div class="error">' + esc(msg) + "</div>" : ""; }
+function setLoading(msg) {
+  document.getElementById("loading").innerHTML = msg ? '<div class="loading"><div class="dot"></div>' + esc(msg) + "</div>" : "";
+  ["memoBtn","receiptBtn","flyerBtn"].forEach(id => document.getElementById(id).disabled = !!msg);
+}
+
+// ===== 画像 → 縮小JPEG base64 =====
+function fileToJpegBase64(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+    r.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("この画像形式を開けませんでした"));
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#FFF"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+// ===== Anthropic API 直接呼び出し =====
+async function callClaude(content) {
+  const key = localStorage.getItem("okaimono.apikey");
+  if (!key) throw new Error("APIキーが未設定です。上の「設定」から入力してください");
+  const model = localStorage.getItem("okaimono.model") || "claude-haiku-4-5-20251001";
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: "user", content }] }),
+  });
+  const raw = await res.text();
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { throw new Error("HTTP " + res.status + ": " + raw.slice(0, 100)); }
+  if (data.error) throw new Error("APIエラー: " + (data.error.message || data.error.type));
+  const text = (data.content || []).map(i => i.type === "text" ? i.text : "").filter(Boolean).join("\n");
+  if (!text) throw new Error("応答が空でした");
+  return text;
+}
+async function analyzeImage(file, prompt) {
+  const b64 = await fileToJpegBase64(file, 1600, 0.8);
+  return callClaude([
+    { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
+    { type: "text", text: prompt },
+  ]);
+}
+
+// ===== プロンプトとパース =====
+const MEMO_PROMPT = `この画像は手書きの買い物メモです。書かれている品目をすべて読み取ってください。
+
+読み取り時の注意:
+- メモは左右2列に分かれていることがあります。その場合は左列を上から下へ、次に右列を上から下へ読んでください
+- 品目の下に引かれた赤い線は区切り線です。取り消し線ではないので、線が引かれた品目も読み取ってください
+- 「1P」「2P」はパック数、「1玉」「1袋」「1びん」「1ケ」なども数量表記です
+- メーカー名と商品名が2行に分かれていても1つの品目としてまとめてください
+- 値段（○○円）は品目ではないので無視してください
+
+出力形式: 1行に1品目、「品目名 | 数量」の形式。数量が無ければ「品目名 |」だけで構いません。
+説明・前置きなど品目以外の文章は一切書かないでください。`;
+const FLYER_PROMPT = `この画像はスーパーのチラシです。赤いペンで丸く囲まれた（またはチェックや線で印が付けられた）商品だけを読み取ってください。印の付いていない商品は出力しないでください。
+- 価格は税込価格（〈税込価格○○円〉のような括弧内表記）があればそれを、無ければ表示価格を使ってください
+- メーカー名があれば商品名に含めてください
+出力形式: 1行に1商品、「商品名 | 価格」。価格が読めなければ「商品名 |」。商品以外の文章は一切書かないでください。
+赤い印が1つも見つからない場合は「なし」とだけ書いてください。`;
+const receiptPrompt = names => `この画像はレシートです。購入された商品名と価格をすべて読み取ってください。
+
+私の買い物リストは次のとおりです: ${names.join("、")}
+
+レシートの商品名は略称のことが多いので、意味が同じなら同一品目とみなしてください。
+出力形式: 次の3行だけを書いてください。価格が読み取れた商品は「品目名=価格」、読めなければ品目名のみ。該当が無い行は「なし」。説明は一切書かないでください。
+購入済み: （例: キャベツ=128、ピーマン=98）
+未購入: （品目名を読点区切りで）
+リスト外: （例: アイス=214）`;
+
+function parseMemoLines(text) {
+  return text.split("\n").map(l => l.trim())
+    .filter(l => l && !l.startsWith("出力") && !l.startsWith("例"))
+    .map(l => { const [name, qty] = l.split("|").map(s => (s || "").trim()); return name ? { name, quantity: qty || "" } : null; })
+    .filter(Boolean);
+}
+function parseReceiptLines(text) {
+  const pickRaw = label => {
+    const line = text.split("\n").find(l => l.trim().startsWith(label));
+    if (!line) return [];
+    const body = line.split(":").slice(1).join(":").replace("：", "").trim();
+    if (!body || body === "なし") return [];
+    return body.split(/[、,]/).map(s => s.trim()).filter(Boolean);
+  };
+  const withPrice = arr => arr.map(s => {
+    const [name, ps] = s.split("=").map(x => (x || "").trim());
+    const price = parseInt((ps || "").replace(/[^0-9]/g, ""), 10);
+    return { name, price: isNaN(price) ? null : price };
+  });
+  return { bought: withPrice(pickRaw("購入済み")), notFound: pickRaw("未購入").map(s => s.split("=")[0].trim()), extra: withPrice(pickRaw("リスト外")) };
+}
+
+// ===== 写真選択とハンドラ =====
+function pick(mode) {
+  if (!localStorage.getItem("okaimono.apikey")) {
+    notice("写真の自動読み取りは任意機能です。使うには「🤖 AI読み取り設定」でご自身のAPIキーを設定してください。\nキーが無くても、下の入力欄・「まとめて追加」からリスト作成、予算管理、価格記録など全機能を無料で使えます。");
+    return;
+  }
+  if (mode === "receipt" && state.items.length === 0) { showError("先に買い物リストを作成してください。"); return; }
+  pickMode = mode;
+  document.getElementById("fileInput").click();
+}
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("fileInput").addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    if (pickMode === "memo") handleMemo(f);
+    else if (pickMode === "receipt") handleReceipt(f);
+    else if (pickMode === "flyer") handleFlyer(f);
+  });
+  load(); render();
+  // PWA: Service Worker登録（オフライン起動用）
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  }
+});
+
+async function handleMemo(file) {
+  showError(""); setLoading("メモを読み取っています…");
+  try {
+    const text = await analyzeImage(file, MEMO_PROMPT);
+    const parsed = parseMemoLines(text);
+    if (!parsed.length) { showError("品目を読み取れませんでした。明るい場所で撮り直してみてください。"); }
+    else {
+      parsed.forEach((it, i) => state.items.push({
+        id: Date.now() + "-" + i, name: it.name, category: guessCategory(it.name),
+        quantity: it.quantity, checked: false, plannedPrice: lastPrice(it.name), onSale: false,
+      }));
+      state.receiptResult = null; ui.tab = "list"; save();
+    }
+  } catch (e) { showError("メモの読み取りに失敗しました（" + e.message + "）"); }
+  setLoading(""); render();
+}
+
+async function handleReceipt(file) {
+  showError(""); setLoading("レシートと照合しています…");
+  try {
+    const text = await analyzeImage(file, receiptPrompt(state.items.map(i => i.name)));
+    const p = parseReceiptLines(text);
+    state.receiptResult = { bought: p.bought, notFound: p.notFound, extra: p.extra, at: new Date().toLocaleString("ja-JP") };
+    const names = p.bought.map(b => b.name);
+    state.items.forEach(it => { if (names.some(n => nameMatch(n, it.name))) it.checked = true; });
+    const today = new Date().toISOString().slice(0, 10);
+    [...p.bought, ...p.extra].filter(b => b.name && b.price !== null).forEach((b, i) =>
+      state.priceHistory.push({ id: Date.now() + "-p" + i, name: b.name, price: b.price, date: today }));
+    ui.tab = "check"; save();
+  } catch (e) { showError("レシートの読み取りに失敗しました（" + e.message + "）"); }
+  setLoading(""); render();
+}
+
+async function handleFlyer(file) {
+  showError(""); setLoading("チラシの赤丸商品を照合しています…");
+  try {
+    const text = await analyzeImage(file, FLYER_PROMPT);
+    if (text.trim() === "なし") { showError("赤い印の付いた商品が見つかりませんでした。"); setLoading(""); render(); return; }
+    const circled = parseMemoLines(text);
+    const missing = [], matched = [];
+    circled.forEach(c => {
+      const price = parseInt((c.quantity || "").replace(/[^0-9]/g, ""), 10);
+      const entry = { name: c.name, price: isNaN(price) ? null : price };
+      (state.items.some(it => nameMatch(it.name, c.name)) ? matched : missing).push(entry);
+    });
+    ui.flyerResult = { matched, missing }; ui.tab = "list";
+  } catch (e) { showError("チラシの読み取りに失敗しました（" + e.message + "）"); }
+  setLoading(""); render();
+}
+
+// ===== 接続テスト =====
+async function runDiag() {
+  notice("テスト中…");
+  let msg;
+  try { await callClaude("「OK」とだけ返答してください。"); msg = "✅ 接続成功！読み取り機能が使えます。"; }
+  catch (e) { msg = "❌ 接続失敗: " + e.message; }
+  notice(msg);
+}
+
+// ===== 操作 =====
+function toggleItem(id) { const it = state.items.find(i => i.id === id); if (it) { it.checked = !it.checked; save(); render(); } }
+function removeItem(id) { state.items = state.items.filter(i => i.id !== id); save(); render(); }
+function toggleSale(id) { const it = state.items.find(i => i.id === id); if (it) { it.onSale = !it.onSale; save(); render(); } }
+function editPlan(id) {
+  const it = state.items.find(i => i.id === id); if (!it) return;
+  const input = prompt("予定価格（円）を入力\nチラシや広告の特売価格をここに", it.plannedPrice != null ? String(it.plannedPrice) : "");
+  if (input === null) return;
+  const v = parseInt(input.replace(/[^0-9]/g, ""), 10);
+  it.plannedPrice = isNaN(v) ? null : v; save(); render();
+}
+function addManual() {
+  const name = document.getElementById("newName").value.trim();
+  const cat = document.getElementById("newCat").value;
+  if (!name) return;
+  state.items.push({ id: Date.now() + "-m", name, category: cat, quantity: "", checked: false, plannedPrice: lastPrice(name), onSale: false });
+  save(); render();
+}
+function clearAll() { if (confirm("リストをすべて削除しますか？")) { state.items = []; state.receiptResult = null; save(); render(); } }
+function setBudget(v) { state.budget = v.replace(/[^0-9]/g, ""); save(); renderBudgetOnly(); }
+function setTab(t) { ui.tab = t; render(); }
+function toggleGroup() { ui.grouped = !ui.grouped; render(); }
+function toggleOnlySale() { ui.onlySale = !ui.onlySale; render(); }
+function toggleBulk() { ui.bulkOpen = !ui.bulkOpen; render(); }
+function addBulk() {
+  const taxFree = document.getElementById("bulkTax").checked;
+  const lines = document.getElementById("bulkText").value.split(/[\n、,]/).map(s => s.trim()).filter(Boolean);
+  lines.forEach((line, i) => {
+    let onSale = false, rest = line;
+    if (/^[★☆]/.test(rest) || rest.includes("チラシ") || rest.includes("特売")) {
+      onSale = true; rest = rest.replace(/^[★☆]\s*/, "").replace(/チラシ|特売/g, "").trim();
+    }
+    let plannedPrice = null;
+    const pm = rest.match(/^(.*?)[\s　]*([0-9０-９,，]+)\s*円$/);
+    if (pm) {
+      plannedPrice = parseInt(pm[2].replace(/[^0-9０-９]/g, "").replace(/[０-９]/g, c => "０１２３４５６７８９".indexOf(c)), 10);
+      rest = pm[1].trim();
+    }
+    const m = rest.match(/^(.*?)[\s　]*([0-9０-９]+[Ppパックびんケヶ: 個玉袋本枚束丁食入]*)$/);
+    const name = m && m[1] ? m[1].trim() : rest;
+    const qty = m && m[1] ? m[2] : "";
+    if (plannedPrice != null && taxFree) plannedPrice = Math.round(plannedPrice * 1.08);
+    state.items.push({ id: Date.now() + "-b" + i, name, category: guessCategory(name), quantity: qty, checked: false, plannedPrice: plannedPrice != null ? plannedPrice : lastPrice(name), onSale });
+  });
+  ui.bulkOpen = false; ui.bulkText = ""; save(); render();
+}
+function addFromFlyer(idx) {
+  const m = ui.flyerResult.missing[idx]; if (!m) return;
+  state.items.push({ id: Date.now() + "-f", name: m.name, category: guessCategory(m.name), quantity: "", checked: false, plannedPrice: m.price, onSale: true });
+  ui.flyerResult.missing.splice(idx, 1); save(); render();
+}
+function closeFlyer() { ui.flyerResult = null; render(); }
+function addPriceManual() {
+  const name = document.getElementById("pName").value.trim();
+  const price = parseInt(document.getElementById("pPrice").value, 10);
+  if (!name || isNaN(price)) return;
+  state.priceHistory.push({ id: Date.now() + "-pm", name, price, date: new Date().toISOString().slice(0, 10) });
+  save(); render();
+}
+function removePrice(id) { state.priceHistory = state.priceHistory.filter(e => e.id !== id); save(); render(); }
+function setPriceItem(v) { ui.priceItem = v; render(); }
+
+// ===== データ保管 =====
+function toggleData() { const p = document.getElementById("dataPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; }
+function exportPayload() { return { app: "okaimono-memo", version: 1, exportedAt: new Date().toISOString(), items: state.items, priceHistory: state.priceHistory, budget: state.budget }; }
+function doExport() {
+  const a = document.getElementById("exportArea");
+  a.style.display = "block"; a.value = JSON.stringify(exportPayload());
+  document.getElementById("dataMsg").textContent = "テキストをコピーして保管してください。";
+}
+function doExportCsv() {
+  const rows = [["日付","品目","価格(円)"]];
+  [...state.priceHistory].sort((a,b) => a.date > b.date ? 1 : -1).forEach(e => rows.push([e.date, e.name, String(e.price)]));
+  const a = document.getElementById("exportArea");
+  a.style.display = "block";
+  a.value = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+  document.getElementById("dataMsg").textContent = "価格履歴CSVです。.csvで保存すればExcelで開けます。";
+}
+function downloadBackup() {
+  const blob = new Blob([JSON.stringify(exportPayload(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "okaimono-backup-" + new Date().toISOString().slice(0,10) + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  document.getElementById("dataMsg").textContent = "バックアップファイルを保存しました。";
+}
+function doImport() {
+  try {
+    const d = JSON.parse(document.getElementById("importArea").value.trim());
+    if (d.app !== "okaimono-memo") throw new Error("形式違い");
+    if (!confirm("現在のデータをインポート内容で置き換えます。よろしいですか？")) return;
+    state.items = d.items || []; state.priceHistory = d.priceHistory || []; state.budget = d.budget || "";
+    document.getElementById("importArea").value = "";
+    document.getElementById("dataMsg").textContent = "インポートしました。";
+    save(); render();
+  } catch (e) { document.getElementById("dataMsg").textContent = "インポート失敗: 書き出したテキストを貼り付けてください。"; }
+}
+
+// ===== 描画 =====
+function gaugeHtml() {
+  const budgetNum = parseInt(state.budget, 10);
+  if (isNaN(budgetNum)) return "";
+  const total = state.items.reduce((s, i) => s + (i.plannedPrice || 0), 0);
+  const left = budgetNum - total;
+  const pct = Math.min(total / Math.max(budgetNum, 1) * 100, 100);
+  return '<div class="btrack"><div class="bfill' + (left < 0 ? " over" : "") + '" style="width:' + pct + '%"></div></div>' +
+    '<div class="bleft" style="color:' + (left < 0 ? "#B03A3A" : "#4C8C4A") + '">' +
+    (left < 0 ? "予算オーバー " + Math.abs(left).toLocaleString() + "円" : "のこり " + left.toLocaleString() + "円") + "</div>";
+}
+function budgetHtml() {
+  const total = state.items.reduce((s, i) => s + (i.plannedPrice || 0), 0);
+  const noPriceCount = state.items.filter(i => i.plannedPrice == null).length;
+  return '<div class="boxframe" id="budgetBox"><div class="budget-row"><b>予算</b>' +
+    '<input inputmode="numeric" value="' + esc(state.budget) + '" placeholder="例: 3000" oninput="setBudget(this.value)">' +
+    '<span style="font-size:12px;color:#6B7280;">円</span><span style="flex:1"></span>' +
+    '<span>予定合計 <b>' + total.toLocaleString() + '</b>円' +
+    (noPriceCount && state.items.length ? '<span style="font-size:10px;color:#9CA3AF;">（' + noPriceCount + '品は価格未定）</span>' : "") + "</span></div>" +
+    '<div id="bgauge">' + gaugeHtml() + "</div></div>";
+}
+function renderBudgetOnly() {
+  // 入力欄は再生成せず、ゲージ部分だけ更新（フォーカス消失防止）
+  const g = document.getElementById("bgauge");
+  if (g) g.innerHTML = gaugeHtml();
+}
+function itemRow(it, showCat) {
+  return '<div class="row">' +
+    '<button class="rowmain" onclick="toggleItem(\'' + it.id + '\')">' +
+    '<span class="cb' + (it.checked ? " on" : "") + '">' + (it.checked ? "✓" : "") + "</span>" +
+    '<span class="iname' + (it.checked ? " done" : "") + '">' +
+    (it.onSale ? '<span class="saletag">チラシ</span>' : "") + esc(it.name) +
+    (it.quantity ? ' <span class="qty">' + esc(it.quantity) + "</span>" : "") + "</span>" +
+    (showCat ? '<span style="font-size:10px;color:' + catColor(it.category) + ';white-space:nowrap;">' + esc(it.category) + "</span>" : "") +
+    "</button>" +
+    '<a class="rowbtn" style="font-size:14px;opacity:0.6;" target="_blank" rel="noopener" href="https://www.google.com/search?udm=2&q=' + encodeURIComponent(it.name) + '">🔍</a>' +
+    '<button class="rowbtn" style="opacity:' + (it.onSale ? 1 : 0.35) + '" onclick="toggleSale(\'' + it.id + '\')">🏷</button>' +
+    '<button class="planbtn' + (it.onSale ? " sale" : "") + '" style="opacity:' + (it.plannedPrice != null ? 1 : 0.5) + '" onclick="editPlan(\'' + it.id + '\')">' +
+    (it.plannedPrice != null ? "¥" + it.plannedPrice.toLocaleString() : "¥?") + "</button>" +
+    '<button class="delbtn" onclick="removeItem(\'' + it.id + '\')">×</button></div>';
+}
+function renderList() {
+  let h = "";
+  if (ui.flyerResult) {
+    const f = ui.flyerResult;
+    h += '<div class="flyerbox"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><b>🔴 チラシ照合結果</b><button class="smallbtn" onclick="closeFlyer()">閉じる</button></div>';
+    if (f.missing.length) {
+      h += '<div style="font-size:13px;font-weight:700;color:#B03A3A;margin-bottom:6px;">メモに無い赤丸商品 ' + f.missing.length + ' 品（書き忘れ？）</div>';
+      f.missing.forEach((m, i) => {
+        h += '<div style="display:flex;align-items:center;gap:8px;font-size:14px;padding:5px 0;border-bottom:1px dashed #F0D5D5;"><span style="flex:1">' + esc(m.name) +
+          (m.price != null ? '<span class="pricetag">' + m.price + "円</span>" : "") +
+          '</span><button class="smallbtn" style="border-color:var(--red);color:#B03A3A;" onclick="addFromFlyer(' + i + ')">＋追加</button></div>';
+      });
+    } else h += '<div style="font-size:13px;color:#2F5E2E;font-weight:700;">✅ 赤丸の商品はすべてリストにあります。書き忘れなし！</div>';
+    if (f.matched.length) h += '<div style="font-size:11px;color:#6B7280;margin-top:10px;line-height:1.6;">リストと一致: ' + f.matched.map(m => esc(m.name)).join("、") + "</div>";
+    h += "</div>";
+  }
+  h += budgetHtml();
+  if (state.items.length) {
+    h += '<div style="display:flex;justify-content:space-between;margin-bottom:10px;gap:6px;flex-wrap:wrap;">' +
+      '<button class="smallbtn" onclick="toggleGroup()">' + (ui.grouped ? "並び: カテゴリ別 ▾" : "並び: 追加順 ▾") + "</button>" +
+      '<button class="smallbtn' + (ui.onlySale ? " on" : "") + '" onclick="toggleOnlySale()">🏷 チラシのみ</button>' +
+      '<button class="smallbtn" style="color:#B0563B" onclick="clearAll()">全削除</button></div>';
+  } else {
+    h += '<div class="empty"><div style="font-size:40px;">🛒</div><p style="margin:8px 0 0;">「メモを読み取る」で写真から、<br>下の入力欄から手動で品目を追加できます。</p></div>';
+  }
+  const visible = ui.onlySale ? state.items.filter(i => i.onSale) : state.items;
+  const groups = ui.grouped
+    ? CATEGORIES.map(c => ({ cat: c.id, list: visible.filter(i => i.category === c.id) })).filter(g => g.list.length)
+    : [{ cat: null, list: visible }];
+  groups.forEach(g => {
+    h += '<section style="margin-bottom:14px;">';
+    if (g.cat) h += '<div class="catlabel" style="color:' + catColor(g.cat) + '">' + esc(g.cat) +
+      '<span class="catcount">' + g.list.filter(i => !i.checked).length + "/" + g.list.length + "</span></div>";
+    g.list.forEach(it => h += itemRow(it, !ui.grouped));
+    h += "</section>";
+  });
+  h += '<div class="addbox"><input type="text" id="newName" placeholder="品目を追加（例: 牛乳）">' +
+    '<select id="newCat">' + CATEGORIES.map(c => '<option value="' + c.id + '">' + c.id + "</option>").join("") + "</select>" +
+    '<button class="addbtn" onclick="addManual()">追加</button></div>';
+  h += '<div style="margin-top:10px;"><button class="smallbtn" onclick="toggleBulk()">' + (ui.bulkOpen ? "▲ まとめて追加を閉じる" : "▼ テキストからまとめて追加") + "</button>";
+  if (ui.bulkOpen) {
+    h += '<div style="margin-top:8px;"><textarea id="bulkText" rows="6" oninput="ui.bulkText=this.value" placeholder="1行に1品目ずつ入力&#10;★を付けるとチラシ品になります&#10;例:&#10;★キャベツ 1玉 98円&#10;牛乳 178円">' + esc(ui.bulkText) + '</textarea>' +
+      '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#4B5563;margin-top:8px;"><input type="checkbox" id="bulkTax">税抜価格として入力（8%を自動で加算して税込にする）</label>' +
+      '<button class="addbtn" style="width:100%;margin-top:6px;" onclick="addBulk()">カテゴリを自動判定してリストに追加</button></div>';
+  }
+  h += "</div>";
+  return h;
+}
+function renderCheck() {
+  const r = state.receiptResult;
+  if (!r) return '<div class="empty"><div style="font-size:40px;">🧾</div><p style="margin:8px 0 0;">会計のあと「レシートで確認」で撮影すると、<br>買い忘れを自動チェックします。</p></div>';
+  let h = '<p style="font-size:12px;color:#9CA3AF;margin:0 0 10px;">照合日時: ' + esc(r.at) + "</p>";
+  const actual = [...r.bought, ...r.extra].reduce((s, b) => s + (b.price || 0), 0);
+  const budgetNum = parseInt(state.budget, 10);
+  if (actual > 0) {
+    h += '<div class="boxframe" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;padding:12px 14px;"><span>お買い物合計（読み取り分）</span><b style="font-size:18px;">' + actual.toLocaleString() + "円</b>";
+    if (!isNaN(budgetNum)) h += '<span style="font-size:12px;font-weight:700;color:' + (actual > budgetNum ? "#B03A3A" : "#2F5E2E") + '">' +
+      (actual > budgetNum ? "予算" + budgetNum.toLocaleString() + "円を" + (actual - budgetNum).toLocaleString() + "円オーバー" : "予算内（残り" + (budgetNum - actual).toLocaleString() + "円）") + "</span>";
+    h += "</div>";
+  }
+  if (r.notFound.length) {
+    h += '<div class="missbox"><div style="font-weight:700;color:#B03A3A;margin-bottom:8px;font-size:15px;">⚠️ 買い忘れの可能性 ' + r.notFound.length + " 品</div>" +
+      r.notFound.map(n => '<div style="font-size:15px;color:#8A2E2E;padding:3px 0;">・' + esc(n) + "</div>").join("") + "</div>";
+  } else h += '<div class="okbox">✅ 買い忘れはありません。おつかれさまでした！</div>';
+  if (r.bought.length) h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">レシートで確認できた品目</div>' +
+    r.bought.map(b => '<div style="font-size:14px;padding:3px 0;">✓ ' + esc(b.name) + (b.price != null ? '<span class="pricetag">' + b.price + "円</span>" : "") + "</div>").join("") + "</div>";
+  if (r.extra.length) h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">リストに無かった購入品</div>' +
+    r.extra.map(b => '<div style="font-size:14px;padding:3px 0;color:#3B7EA6;">+ ' + esc(b.name) + (b.price != null ? '<span class="pricetag">' + b.price + "円</span>" : "") + "</div>").join("") + "</div>";
+  return h;
+}
+function renderPrice() {
+  const names = [...new Set(state.priceHistory.map(e => e.name))].sort();
+  let h = "";
+  if (!names.length) {
+    h += '<div class="empty"><div style="font-size:40px;">📊</div><p style="margin:8px 0 0;">レシートを読み取ると価格が自動記録され、<br>品目別に年間推移をグラフで確認できます。</p></div>';
+  } else {
+    const sel = names.includes(ui.priceItem) ? ui.priceItem : names[0];
+    h += '<select style="width:100%;padding:10px 12px;font-size:15px;font-weight:700;border-radius:10px;border:2px solid var(--ink);background:#FFF;margin-bottom:10px;" onchange="setPriceItem(this.value)">' +
+      names.map(n => '<option' + (n === sel ? " selected" : "") + ">" + esc(n) + "</option>").join("") + "</select>";
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: (d.getMonth() + 1) + "月" });
+    }
+    const data = months.map(m => {
+      const es = state.priceHistory.filter(e => e.name === sel && e.date.startsWith(m.key));
+      return { ...m, avg: es.length ? Math.round(es.reduce((s, e) => s + e.price, 0) / es.length) : null };
+    });
+    const max = Math.max(...data.map(d => d.avg || 0), 1);
+    h += '<div class="box"><div style="font-size:13px;font-weight:700;margin-bottom:12px;">' + esc(sel) + ' の価格推移（月別平均）</div><div class="chartarea">' +
+      data.map(d => '<div class="chartcol"><div class="chartval">' + (d.avg !== null ? d.avg : "") + '</div><div class="bartrack">' +
+        (d.avg !== null ? '<div class="bar" style="height:' + Math.max(d.avg / max * 100, 4) + '%"></div>' : "") +
+        '</div><div class="chartlabel">' + d.label + "</div></div>").join("") +
+      '</div><div style="font-size:10px;color:#9CA3AF;margin-top:8px;">単位: 円（同月に複数回購入した場合は平均）</div></div>';
+    const entries = state.priceHistory.filter(e => e.name === sel).sort((a,b) => a.date < b.date ? 1 : -1);
+    h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">記録履歴（' + esc(sel) + "）</div>" +
+      entries.map(e => '<div style="display:flex;align-items:center;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--line);"><span style="flex:1">' + esc(e.date) + '</span><b>' + e.price + '円</b><button class="delbtn" onclick="removePrice(\'' + e.id + '\')">×</button></div>').join("") + "</div>";
+  }
+  h += '<div class="addbox" style="margin-top:14px;"><input type="text" id="pName" placeholder="品目名" style="flex:1.4;">' +
+    '<input type="text" id="pPrice" inputmode="numeric" placeholder="価格（円）" style="flex:1;padding:10px 12px;font-size:14px;border-radius:10px;border:1.5px solid var(--line);min-width:0;">' +
+    '<button class="addbtn" onclick="addPriceManual()">記録</button></div>';
+  return h;
+}
+function render() {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.tab === ui.tab));
+  const c = document.getElementById("content");
+  c.innerHTML = ui.tab === "list" ? renderList() : ui.tab === "check" ? renderCheck() : renderPrice();
+}
+</script>
+</body>
+</html>
