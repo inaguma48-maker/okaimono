@@ -128,14 +128,14 @@
     <summary>🤖 AI読み取り設定（任意・自分のAPIキーをお持ちの方向け）</summary>
     <div class="hint" style="margin-top:6px;">
       写真からの自動読み取り（メモ・レシート・チラシ）を使いたい場合のみ設定してください。<b>設定しなくても、それ以外の全機能は無料で使えます。</b><br>
-      利用にはAnthropicのAPIキー（従量課金・読み取り1回1円未満目安）が必要です。キーはこのブラウザ内にのみ保存され、Anthropic以外に送信されることはありません。
+      利用にはGoogle AI StudioのGemini APIキーが必要です。キーはこのブラウザ内にのみ保存され、Google以外に送信されることはありません。
     </div>
-    <label>Anthropic APIキー</label>
-    <input type="password" id="apikey" placeholder="sk-ant-...（未設定でもアプリは使えます）" autocomplete="off">
+    <label>Gemini APIキー（Google AI Studio）</label>
+    <input type="password" id="apikey" placeholder="AIza...（未設定でもアプリは使えます）" autocomplete="off">
     <label>読み取りに使うモデル</label>
     <select id="model">
-      <option value="claude-haiku-4-5-20251001">Haiku（速い・安い / おすすめ）</option>
-      <option value="claude-sonnet-4-6">Sonnet（高精度・細かいチラシ向け）</option>
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash（速い・安い / おすすめ）</option>
+      <option value="gemini-2.5-pro">Gemini 2.5 Pro（高精度・細かいチラシ向け）</option>
     </select>
     <div style="display:flex; gap:6px; margin-top:10px;">
       <button class="smallbtn" onclick="saveSettings()">保存</button>
@@ -211,13 +211,13 @@ let pickMode = null;
 function save() { localStorage.setItem("okaimono.data", JSON.stringify(state)); }
 function load() {
   try { const d = JSON.parse(localStorage.getItem("okaimono.data")); if (d) state = Object.assign(state, d); } catch (e) {}
-  document.getElementById("apikey").value = localStorage.getItem("okaimono.apikey") || "";
-  document.getElementById("model").value = localStorage.getItem("okaimono.model") || "claude-haiku-4-5-20251001";
+  document.getElementById("apikey").value = localStorage.getItem("okaimono.geminikey") || "";
+  document.getElementById("model").value = localStorage.getItem("okaimono.geminimodel") || "gemini-2.5-flash";
 
 }
 function saveSettings() {
-  localStorage.setItem("okaimono.apikey", document.getElementById("apikey").value.trim());
-  localStorage.setItem("okaimono.model", document.getElementById("model").value);
+  localStorage.setItem("okaimono.geminikey", document.getElementById("apikey").value.trim());
+  localStorage.setItem("okaimono.geminimodel", document.getElementById("model").value);
   notice("設定を保存しました。「接続テスト」で確認できます。");
 }
 
@@ -268,34 +268,30 @@ function fileToJpegBase64(file, maxDim, quality) {
   });
 }
 
-// ===== Anthropic API 直接呼び出し =====
-async function callClaude(content) {
-  const key = localStorage.getItem("okaimono.apikey");
+// ===== Gemini API 直接呼び出し =====
+async function callGemini(parts) {
+  const key = localStorage.getItem("okaimono.geminikey");
   if (!key) throw new Error("APIキーが未設定です。上の「設定」から入力してください");
-  const model = localStorage.getItem("okaimono.model") || "claude-haiku-4-5-20251001";
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const model = localStorage.getItem("okaimono.geminimodel") || "gemini-2.5-flash";
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({ model, max_tokens: 2000, messages: [{ role: "user", content }] }),
+    headers: { "content-type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { maxOutputTokens: 8192, temperature: 0 } }),
   });
   const raw = await res.text();
   let data;
   try { data = JSON.parse(raw); } catch (e) { throw new Error("HTTP " + res.status + ": " + raw.slice(0, 100)); }
-  if (data.error) throw new Error("APIエラー: " + (data.error.message || data.error.type));
-  const text = (data.content || []).map(i => i.type === "text" ? i.text : "").filter(Boolean).join("\n");
-  if (!text) throw new Error("応答が空でした");
+  if (data.error) throw new Error("APIエラー: " + (data.error.message || data.error.status));
+  const cand = (data.candidates || [])[0];
+  const text = ((cand && cand.content && cand.content.parts) || []).map(p => p.text || "").filter(Boolean).join("\n");
+  if (!text) throw new Error("応答が空でした" + (data.promptFeedback && data.promptFeedback.blockReason ? "（" + data.promptFeedback.blockReason + "）" : ""));
   return text;
 }
 async function analyzeImage(file, prompt) {
   const b64 = await fileToJpegBase64(file, 1600, 0.8);
-  return callClaude([
-    { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-    { type: "text", text: prompt },
+  return callGemini([
+    { inline_data: { mime_type: "image/jpeg", data: b64 } },
+    { text: prompt },
   ]);
 }
 
@@ -350,7 +346,7 @@ function parseReceiptLines(text) {
 
 // ===== 写真選択とハンドラ =====
 function pick(mode) {
-  if (!localStorage.getItem("okaimono.apikey")) {
+  if (!localStorage.getItem("okaimono.geminikey")) {
     notice("写真の自動読み取りは任意機能です。使うには「🤖 AI読み取り設定」でご自身のAPIキーを設定してください。\nキーが無くても、下の入力欄・「まとめて追加」からリスト作成、予算管理、価格記録など全機能を無料で使えます。");
     return;
   }
@@ -427,7 +423,7 @@ async function handleFlyer(file) {
 async function runDiag() {
   notice("テスト中…");
   let msg;
-  try { await callClaude("「OK」とだけ返答してください。"); msg = "✅ 接続成功！読み取り機能が使えます。"; }
+  try { await callGemini([{ text: "「OK」とだけ返答してください。" }]); msg = "✅ 接続成功！読み取り機能が使えます。"; }
   catch (e) { msg = "❌ 接続失敗: " + e.message; }
   notice(msg);
 }
