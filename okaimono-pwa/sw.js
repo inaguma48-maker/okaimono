@@ -16,7 +16,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
-  if (url.hostname === "api.anthropic.com") return; // APIはキャッシュしない
+  if (url.hostname === "generativelanguage.googleapis.com") return; // APIはキャッシュしない
 
   // ページ遷移（index.html）: ネットワーク優先 → 失敗時のみキャッシュ
   if (e.request.mode === "navigate") {
