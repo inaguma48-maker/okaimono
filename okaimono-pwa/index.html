@@ -133,10 +133,12 @@
     <label>Gemini APIキー（Google AI Studio）</label>
     <input type="password" id="apikey" placeholder="AIza...（未設定でもアプリは使えます）" autocomplete="off">
     <label>読み取りに使うモデル</label>
-    <select id="model">
-      <option value="gemini-2.5-flash">Gemini 2.5 Flash（速い・安い / おすすめ）</option>
-      <option value="gemini-2.5-pro">Gemini 2.5 Pro（高精度・細かいチラシ向け）</option>
-    </select>
+    <input type="text" id="model" list="modelList" placeholder="gemini-3-flash-preview" autocomplete="off">
+    <datalist id="modelList">
+      <option value="gemini-3-flash-preview">
+      <option value="gemini-2.5-flash">
+    </datalist>
+    <div class="hint">モデル名はGoogle AI Studioで無料枠の対象になっているものを入力してください。</div>
     <div style="display:flex; gap:6px; margin-top:10px;">
       <button class="smallbtn" onclick="saveSettings()">保存</button>
       <button class="smallbtn" onclick="runDiag()">⚙️ 接続テスト</button>
@@ -212,12 +214,12 @@ function save() { localStorage.setItem("okaimono.data", JSON.stringify(state)); 
 function load() {
   try { const d = JSON.parse(localStorage.getItem("okaimono.data")); if (d) state = Object.assign(state, d); } catch (e) {}
   document.getElementById("apikey").value = localStorage.getItem("okaimono.geminikey") || "";
-  document.getElementById("model").value = localStorage.getItem("okaimono.geminimodel") || "gemini-2.5-flash";
+  document.getElementById("model").value = localStorage.getItem("okaimono.geminimodel") || "gemini-3-flash-preview";
 
 }
 function saveSettings() {
   localStorage.setItem("okaimono.geminikey", document.getElementById("apikey").value.trim());
-  localStorage.setItem("okaimono.geminimodel", document.getElementById("model").value);
+  localStorage.setItem("okaimono.geminimodel", document.getElementById("model").value.trim());
   notice("設定を保存しました。「接続テスト」で確認できます。");
 }
 
@@ -272,7 +274,7 @@ function fileToJpegBase64(file, maxDim, quality) {
 async function callGemini(parts) {
   const key = localStorage.getItem("okaimono.geminikey");
   if (!key) throw new Error("APIキーが未設定です。上の「設定」から入力してください");
-  const model = localStorage.getItem("okaimono.geminimodel") || "gemini-2.5-flash";
+  const model = localStorage.getItem("okaimono.geminimodel") || "gemini-3-flash-preview";
   const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent", {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": key },
