@@ -160,6 +160,7 @@
     <button class="tab on" data-tab="list" onclick="setTab('list')">リスト</button>
     <button class="tab" data-tab="check" onclick="setTab('check')">買い忘れ確認</button>
     <button class="tab" data-tab="price" onclick="setTab('price')">価格推移</button>
+    <button class="tab" data-tab="spend" onclick="setTab('spend')">支出</button>
   </div>
 
   <div id="content"></div>
@@ -364,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else if (pickMode === "receipt") handleReceipt(f);
     else if (pickMode === "flyer") handleFlyer(f);
   });
-  load(); render();
+  load(); render(); dbRefresh();
   // PWA: Service Worker登録（オフライン起動用）
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -400,6 +401,11 @@ async function handleReceipt(file) {
     [...p.bought, ...p.extra].filter(b => b.name && b.price !== null).forEach((b, i) =>
       state.priceHistory.push({ id: Date.now() + "-p" + i, name: b.name, price: b.price, date: today }));
     ui.tab = "check"; save();
+    const spent = [...p.bought.map(b => ({ ...b, extra: false })), ...p.extra.map(b => ({ ...b, extra: true }))].filter(b => b.name && b.price !== null);
+    if (spent.length) {
+      try { await dbAddReceipt({ id: Date.now() + "-r", date: today, at: state.receiptResult.at, total: spent.reduce((s, b) => s + b.price, 0), items: spent }); await dbRefresh(); }
+      catch (e2) { notice("レシートのDB保存に失敗しました（" + e2.message + "）"); }
+    }
   } catch (e) { showError("レシートの読み取りに失敗しました（" + e.message + "）"); }
   setLoading(""); render();
 }
@@ -639,6 +645,51 @@ function renderCheck() {
     r.extra.map(b => '<div style="font-size:14px;padding:3px 0;color:#3B7EA6;">+ ' + esc(b.name) + (b.price != null ? '<span class="pricetag">' + b.price + "円</span>" : "") + "</div>").join("") + "</div>";
   return h;
 }
+// ===== レシートDB（このブラウザ内のIndexedDB） =====
+let receipts = [];
+function dbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject(new Error("このブラウザはIndexedDBに対応していません"));
+    const rq = indexedDB.open("okaimono-db", 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore("receipts", { keyPath: "id" });
+    rq.onsuccess = () => resolve(rq.result);
+    rq.onerror = () => reject(rq.error || new Error("DBを開けませんでした"));
+  });
+}
+async function dbTx(mode, fn) {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("receipts", mode);
+    const rq = fn(tx.objectStore("receipts"));
+    tx.oncomplete = () => { db.close(); resolve(rq ? rq.result : undefined); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(tx.error || new Error("DB書き込みに失敗しました")); };
+  });
+}
+const dbAddReceipt = r => dbTx("readwrite", st => st.put(r));
+const dbDeleteReceipt = id => dbTx("readwrite", st => st.delete(id));
+async function dbRefresh() {
+  try { receipts = (await dbTx("readonly", st => st.getAll())) || []; } catch (e) { receipts = []; }
+  render();
+}
+async function removeReceipt(id) { await dbDeleteReceipt(id); await dbRefresh(); }
+function renderSpend() {
+  if (!receipts.length) return '<div class="empty"><div style="font-size:40px;">💴</div><p style="margin:8px 0 0;">「レシートで確認」で読み取ると、金額がこの端末のDBに保存され、<br>月別の支出推移を確認できます。</p></div>';
+  const now = new Date(), months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"), label: (d.getMonth() + 1) + "月" });
+  }
+  const data = months.map(m => ({ ...m, sum: receipts.filter(r => r.date.startsWith(m.key)).reduce((s, r) => s + r.total, 0) }));
+  const max = Math.max(...data.map(d => d.sum), 1);
+  let h = '<div class="box"><div style="font-size:13px;font-weight:700;margin-bottom:12px;">月別の支出推移</div><div class="chartarea">' +
+    data.map(d => '<div class="chartcol"><div class="chartval">' + (d.sum ? d.sum.toLocaleString() : "") + '</div><div class="bartrack">' +
+      (d.sum ? '<div class="bar" style="height:' + Math.max(d.sum / max * 100, 4) + '%"></div>' : "") +
+      '</div><div class="chartlabel">' + d.label + "</div></div>").join("") +
+    '</div><div style="font-size:10px;color:#9CA3AF;margin-top:8px;">単位: 円（レシートから読み取れた金額の合計）</div></div>';
+  h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">保存済みレシート</div>' +
+    [...receipts].sort((a, b) => a.id < b.id ? 1 : -1).map(r => '<div style="display:flex;align-items:center;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--line);"><span style="flex:1">' + esc(r.date) + ' <span style="font-size:11px;color:#9CA3AF;">' + r.items.length + '品</span></span><b>' + r.total.toLocaleString() + '円</b><button class="delbtn" onclick="removeReceipt(\'' + r.id + '\')">×</button></div>').join("") + "</div>";
+  return h;
+}
 function renderPrice() {
   const names = [...new Set(state.priceHistory.map(e => e.name))].sort();
   let h = "";
@@ -676,7 +727,7 @@ function renderPrice() {
 function render() {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.tab === ui.tab));
   const c = document.getElementById("content");
-  c.innerHTML = ui.tab === "list" ? renderList() : ui.tab === "check" ? renderCheck() : renderPrice();
+  c.innerHTML = ui.tab === "list" ? renderList() : ui.tab === "check" ? renderCheck() : ui.tab === "spend" ? renderSpend() : renderPrice();
 }
 </script>
 </body>
