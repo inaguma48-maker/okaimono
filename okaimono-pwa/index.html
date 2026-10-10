@@ -673,7 +673,7 @@ async function dbRefresh() {
 }
 async function removeReceipt(id) { await dbDeleteReceipt(id); await dbRefresh(); }
 function renderSpend() {
-  if (!receipts.length) return '<div class="empty"><div style="font-size:40px;">💴</div><p style="margin:8px 0 0;">「レシートで確認」で読み取ると、金額がこの端末のDBに保存され、<br>月別の支出推移と品目別の金額順位を確認できます。</p></div>';
+  if (!receipts.length) return '<div class="empty"><div style="font-size:40px;">💴</div><p style="margin:8px 0 0;">「レシートで確認」で読み取ると、金額がこの端末のDBに保存され、<br>月別の支出推移を確認できます。</p></div>';
   const now = new Date(), months = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -686,11 +686,6 @@ function renderSpend() {
       (d.sum ? '<div class="bar" style="height:' + Math.max(d.sum / max * 100, 4) + '%"></div>' : "") +
       '</div><div class="chartlabel">' + d.label + "</div></div>").join("") +
     '</div><div style="font-size:10px;color:#9CA3AF;margin-top:8px;">単位: 円（レシートから読み取れた金額の合計）</div></div>';
-  const byName = {};
-  receipts.forEach(r => r.items.forEach(it => { const o = byName[it.name] || (byName[it.name] = { name: it.name, sum: 0, n: 0 }); o.sum += it.price; o.n++; }));
-  const rank = Object.values(byName).sort((a, b) => b.sum - a.sum).slice(0, 10);
-  h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">品目別 金額順位（上位10）</div>' +
-    rank.map((o, i) => '<div style="display:flex;align-items:center;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--line);"><span style="width:28px;font-weight:700;">' + (i + 1) + '位</span><span style="flex:1">' + esc(o.name) + ' <span style="font-size:11px;color:#9CA3AF;">' + o.n + '回</span></span><b>' + o.sum.toLocaleString() + "円</b></div>").join("") + "</div>";
   h += '<div class="box"><div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;">保存済みレシート</div>' +
     [...receipts].sort((a, b) => a.id < b.id ? 1 : -1).map(r => '<div style="display:flex;align-items:center;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--line);"><span style="flex:1">' + esc(r.date) + ' <span style="font-size:11px;color:#9CA3AF;">' + r.items.length + '品</span></span><b>' + r.total.toLocaleString() + '円</b><button class="delbtn" onclick="removeReceipt(\'' + r.id + '\')">×</button></div>').join("") + "</div>";
   return h;
